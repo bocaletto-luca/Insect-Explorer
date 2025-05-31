@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Insect Species Explorer</title>
+  <style>
+    /* Stili di base */
+    body {
+      background: #f4f4f4;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #2E7D32;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    #container {
+      max-width: 1200px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    /* Barra di ricerca */
+    .search-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .search-bar input[type="text"] {
+      padding: 8px;
+      font-size: 1em;
+      width: 300px;
+    }
+    .search-bar button {
+      padding: 8px 12px;
+      font-size: 1em;
+      background: #2E7D32;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    /* Sezione filtri aggiuntivi: alfabetico e per famiglia */
+    .filters {
+      margin-bottom: 20px;
+    }
+    .filter-group {
+      margin-bottom: 10px;
+    }
+    .filter-group strong {
+      margin-right: 10px;
+    }
+    .filter-group span {
+      display: inline-block;
+      padding: 6px 10px;
+      background: #eee;
+      margin: 3px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .filter-group span.selected {
+      background: #2E7D32;
+      color: white;
+    }
+    /* Griglia risultati */
+    #results {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .specimen-card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .specimen-card:hover {
+      transform: scale(1.02);
+    }
+    .specimen-card h3 {
+      margin: 10px 0 5px;
+      font-size: 18px;
+      color: #2E7D32;
+    }
+    .specimen-card p {
+      font-size: 14px;
+      color: #555;
+      margin: 5px 0;
+    }
+    /* Paginazione */
+    .pagination {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .pagination button {
+      padding: 8px 12px;
+      margin: 0 5px;
+      font-size: 1em;
+      background: #2E7D32;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .pagination span {
+      font-size: 1em;
+      margin: 0 10px;
+    }
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: 4px;
+      max-width: 800px;
+      width: 90%;
+      padding: 20px;
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-content img {
+      max-width: 100%;
+      max-height: 400px;
+      display: block;
+      margin: 0 auto 15px;
+    }
+    .modal-content h2 {
+      margin-top: 0;
+      color: #2E7D32;
+    }
+    .modal-content p {
+      line-height: 1.5;
+      margin: 10px 0;
+    }
+    .close {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Insect Species Explorer</h1>
+    <p>Esplora specie di insetti del mondo tramite dati GBIF e approfondimenti da Wikipedia</p>
+  </header>
+  
+  <div id="container">
+    <!-- Barra di ricerca -->
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Cerca specie (es. Formica, Danaus)"/>
+      <button id="searchBtn">Cerca</button>
+      <button id="resetBtn">All</button>
+    </div>
+    <!-- Sezione filtri: alfabetico e per famiglia -->
+    <div class="filters">
+      <div class="filter-group" id="alphabetFilter">
+        <strong>Alphabet:</strong>
+        <!-- Pulsanti A-Z (e ALL) verranno generati -->
+      </div>
+      <div class="filter-group" id="familyFilter">
+        <strong>Family:</strong>
+        <!-- Pulsanti per famiglia verranno generati dinamicamente -->
+      </div>
+    </div>
+    <!-- Griglia dei risultati -->
+    <div id="results"></div>
+    <!-- Paginazione -->
+    <div class="pagination">
+      <button id="prevPage">Precedente</button>
+      <span id="pageInfo">Pagina 1</span>
+      <button id="nextPage">Successiva</button>
+    </div>
+  </div>
+  
+  <!-- Finestra modale per dettagli -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="modalClose">&times;</span>
+      <div id="modalBody">
+        <!-- Dettagli e approfondimenti verranno inseriti qui -->
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Variabili globali
+    let speciesList = []; // Dati grezzi ottenuti dalla GBIF API
+    let searchQuery = "";  // Testo di ricerca libero
+    let alphaFilter = "";
+    let familyFilter = "";
+    let currentPage = 1;
+    const perPage = 20;
+    
+    // Funzione per effettuare il fetch delle specie di insetti (classe Insecta)
+    async function fetchSpecies() {
+      try {
+        // Richiediamo 100 record di specie, limitando per "kingdom=Animalia", "class=Insecta" e "rank=SPECIES"
+        const url = "https://api.gbif.org/v1/species/search?kingdom=Animalia&class=Insecta&rank=SPECIES&limit=100";
+        const response = await fetch(url);
+        const data = await response.json();
+        speciesList = data.results || [];
+        populateFamilyFilterButtons();
+        populateAlphabetFilterButtons();
+      } catch (error) {
+        console.error("Errore nella fetch dei dati GBIF:", error);
+      }
+    }
+    
+    // Funzione per ottenere l'insieme filtrato di specie in base ai parametri
+    function getFilteredSpecies() {
+      return speciesList.filter(species => {
+        const name = species.scientificName || species.canonicalName || "";
+        const family = species.family || "";
+        let match = true;
+        if (searchQuery) {
+          match = match && name.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+        if (alphaFilter) {
+          match = match && name.trim().charAt(0).toUpperCase() === alphaFilter;
+        }
+        if (familyFilter) {
+          match = match && (family.toLowerCase() === familyFilter.toLowerCase());
+        }
+        return match;
+      });
+    }
+    
+    // Funzione per renderizzare i risultati con paginazione
+    function renderSpecies() {
+      const filtered = getFilteredSpecies();
+      const totalItems = filtered.length;
+      const totalPages = Math.ceil(totalItems / perPage) || 1;
+      if (currentPage > totalPages) currentPage = 1;
+      document.getElementById("pageInfo").textContent = `Pagina ${currentPage} di ${totalPages}`;
+      // Abilita/disabilita la paginazione
+      document.getElementById("prevPage").disabled = (currentPage <= 1);
+      document.getElementById("nextPage").disabled = (currentPage >= totalPages);
+      
+      const start = (currentPage - 1) * perPage;
+      const pageItems = filtered.slice(start, start + perPage);
+      
+      const resultsContainer = document.getElementById("results");
+      resultsContainer.innerHTML = "";
+      if (pageItems.length === 0) {
+        resultsContainer.innerHTML = "<p>Nessuna specie trovata.</p>";
+        return;
+      }
+      
+      pageItems.forEach(species => {
+        const card = document.createElement("div");
+        card.className = "specimen-card";
+        const name = species.scientificName || species.canonicalName || "N/D";
+        const family = species.family || "Sconosciuta";
+        const rank = species.rank || "N/D";
+        card.innerHTML = `
+          <h3>${name}</h3>
+          <p><strong>Famiglia:</strong> ${family}</p>
+          <p><strong>Rango:</strong> ${rank}</p>
+        `;
+        // Al click, apri la modal con il dettaglio
+        card.addEventListener("click", () => showModal(species));
+        resultsContainer.appendChild(card);
+      });
+    }
+    
+    // Gestione paginazione
+    document.getElementById("prevPage").addEventListener("click", () => {
+      if (currentPage > 1) { currentPage--; renderSpecies(); }
+    });
+    document.getElementById("nextPage").addEventListener("click", () => {
+      const totalPages = Math.ceil(getFilteredSpecies().length / perPage) || 1;
+      if (currentPage < totalPages) { currentPage++; renderSpecies(); }
+    });
+    
+    // Eventi per la ricerca libera
+    document.getElementById("searchBtn").addEventListener("click", () => {
+      searchQuery = document.getElementById("searchInput").value.trim();
+      currentPage = 1;
+      renderSpecies();
+    });
+    document.getElementById("searchInput").addEventListener("keyup", (e) => {
+      if (e.key === "Enter") {
+        searchQuery = document.getElementById("searchInput").value.trim();
+        currentPage = 1;
+        renderSpecies();
+      }
+    });
+    // Pulsante reset: rimuove tutti i filtri
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      searchQuery = "";
+      alphaFilter = "";
+      familyFilter = "";
+      document.getElementById("searchInput").value = "";
+      updateAlphabetFilterUI();
+      updateFamilyFilterUI();
+      currentPage = 1;
+      renderSpecies();
+    });
+    
+    // Filtri alfabetici: generazione dei pulsanti
+    function populateAlphabetFilterButtons() {
+      const container = document.getElementById("alphabetFilter");
+      container.innerHTML = "<strong>Alphabet:</strong> ";
+      const allBtn = document.createElement("span");
+      allBtn.textContent = "ALL";
+      allBtn.dataset.letter = "";
+      allBtn.className = (!alphaFilter ? "selected" : "");
+      allBtn.addEventListener("click", () => {
+        alphaFilter = "";
+        currentPage = 1;
+        updateAlphabetFilterUI();
+        renderSpecies();
+      });
+      container.appendChild(allBtn);
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(letter => {
+        const btn = document.createElement("span");
+        btn.textContent = letter;
+        btn.dataset.letter = letter;
+        if (alphaFilter === letter) btn.classList.add("selected");
+        btn.addEventListener("click", () => {
+          alphaFilter = (alphaFilter === letter ? "" : letter);
+          currentPage = 1;
+          updateAlphabetFilterUI();
+          renderSpecies();
+        });
+        container.appendChild(btn);
+      });
+    }
+    function updateAlphabetFilterUI() {
+      const buttons = document.querySelectorAll("#alphabetFilter span");
+      buttons.forEach(btn => {
+        if(btn.dataset.letter === alphaFilter) {
+          btn.classList.add("selected");
+        } else {
+          btn.classList.remove("selected");
+        }
+      });
+    }
+    
+    // Filtri per famiglia: generazione dinamica in base al dataset
+    function populateFamilyFilterButtons() {
+      const container = document.getElementById("familyFilter");
+      container.innerHTML = "<strong>Family:</strong> ";
+      const allBtn = document.createElement("span");
+      allBtn.textContent = "ALL";
+      allBtn.dataset.family = "";
+      allBtn.className = (!familyFilter ? "selected" : "");
+      allBtn.addEventListener("click", () => {
+        familyFilter = "";
+        currentPage = 1;
+        updateFamilyFilterUI();
+        renderSpecies();
+      });
+      container.appendChild(allBtn);
+      // Estrae le famiglie uniche dal dataset
+      const families = [...new Set(speciesList.map(s => s.family).filter(Boolean))].sort();
+      families.forEach(fam => {
+        const btn = document.createElement("span");
+        btn.textContent = fam;
+        btn.dataset.family = fam;
+        if (familyFilter === fam) btn.classList.add("selected");
+        btn.addEventListener("click", () => {
+          familyFilter = (familyFilter === fam) ? "" : fam;
+          currentPage = 1;
+          updateFamilyFilterUI();
+          renderSpecies();
+        });
+        container.appendChild(btn);
+      });
+    }
+    function updateFamilyFilterUI() {
+      const buttons = document.querySelectorAll("#familyFilter span");
+      buttons.forEach(btn => {
+        if (btn.dataset.family === familyFilter) {
+          btn.classList.add("selected");
+        } else {
+          btn.classList.remove("selected");
+        }
+      });
+    }
+    
+    // Funzione per mostrare il dettaglio in modal; integriamo la Wikipedia REST API per descrizione e immagine
+    async function getWikiSummary(scientificName) {
+      try {
+        const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(scientificName)}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          return await response.json();
+        }
+        return null;
+      } catch (error) {
+        console.error("Errore nel recuperare dati da Wikipedia:", error);
+        return null;
+      }
+    }
+    
+    async function showModal(species) {
+      const modal = document.getElementById("modal");
+      const modalBody = document.getElementById("modalBody");
+      const name = species.scientificName || species.canonicalName || "N/D";
+      const family = species.family || "Sconosciuta";
+      const rank = species.rank || "N/D";
+      
+      let html = `<h2>${name}</h2>
+                  <p><strong>Famiglia:</strong> ${family}</p>
+                  <p><strong>Rango:</strong> ${rank}</p>`;
+      
+      // Proviamo a ottenere un approfondimento da Wikipedia
+      const wikiData = await getWikiSummary(name);
+      if (wikiData) {
+        if (wikiData.thumbnail && wikiData.thumbnail.source) {
+          html = `<img src="${wikiData.thumbnail.source}" alt="${name}">` + html;
+        }
+        if (wikiData.extract) {
+          html += `<p><strong>Descrizione:</strong></p><p>${wikiData.extract}</p>`;
+        }
+      } else {
+        html += `<p><em>Nessuna descrizione aggiuntiva disponibile.</em></p>`;
+      }
+      modalBody.innerHTML = html;
+      modal.style.display = "flex";
+    }
+    
+    // Gestione chiusura modal
+    document.getElementById("modalClose").addEventListener("click", () => {
+      document.getElementById("modal").style.display = "none";
+    });
+    window.addEventListener("click", (e) => {
+      if (e.target === document.getElementById("modal")) {
+        document.getElementById("modal").style.display = "none";
+      }
+    });
+    
+    // Inizializzazione: al caricamento, esegue il fetch dei dati e inizializza i filtri
+    window.addEventListener("load", async () => {
+      await fetchSpecies();
+      populateFamilyFilterButtons();
+      populateAlphabetFilterButtons();
+      renderSpecies();
+    });
+  </script>
+</body>
+</html>

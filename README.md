@@ -8,6 +8,8 @@
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
 ![API](https://img.shields.io/badge/API-Free%20Open%20Data-9cf?style=flat-square&logo=bug)
 
+[![Test Online](https://img.shields.io/badge/Test%20Online-Click%20Here-brightgreen?style=for-the-badge)](https://bocaletto-luca.github.io/Insext-Explorer/)
+
 ## 📌 Overview
 
 **Insect Explorer** is a fascinating **web app** that allows users to **search, identify, and learn about various insect species** using **free open-data APIs**.  
